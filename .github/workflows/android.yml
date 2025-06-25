@@ -3,7 +3,10 @@ name: Android APK
 on:
   push:
     branches: [main]
-    paths: ["**/*.py", "buildozer.spec", ".github/workflows/android.yml"]
+    paths:
+      - "**/*.py"
+      - buildozer.spec
+      - .github/workflows/android.yml
   workflow_dispatch:
 
 jobs:
@@ -15,10 +18,10 @@ jobs:
       PYTHON_VERSION: "3.11"
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_HOME:      ${{ github.workspace }}/android-sdk
-      PIP_DISABLE_PIP_VERSION_CHECK: 1
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
     steps:
-    # ───────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────
     - name: 📥 Check out code
       uses: actions/checkout@v4
 
@@ -47,7 +50,7 @@ jobs:
       id: cache-sdk
       with:
         path: ${{ env.ANDROID_SDK_ROOT }}
-        key: android-sdk-${{ runner.os }}-v5   # bumpa vid ändringar
+        key: android-sdk-${{ runner.os }}-v5   # bumpa när du vill tömma cachen
 
     - name: 📦 Download cmdline‑tools (if cache miss)
       if: steps.cache-sdk.outputs.cache-hit != 'true'
@@ -63,11 +66,16 @@ jobs:
         yes | sdkmanager --licenses
         sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "ndk;25.2.9519653"
 
+    # ─── Python‑/Buildozer‑toolchain ─────────────────────────
     - name: 🐍 Install Buildozer + pinned deps
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install --no-binary ":all:" Cython==0.29.36
-        python -m pip install buildozer==1.* "python-for-android @ https://github.com/kivy/python-for-android/archive/refs/tags/2024.04.08.zip"
+        # uppdatera pip & bygghjul
+        python -m pip install --upgrade pip setuptools wheel
+        # Cython <3 krävs av p4a just nu
+        python -m pip install "Cython<3"
+        # stabil p4a‑release + buildozer
+        python -m pip install python-for-android==2024.4.23 "buildozer==1.*"
+        # se till att ~/.local/bin finns i PATH för följande steg
         echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: 🔄 Clean previous state
@@ -77,7 +85,7 @@ jobs:
     - name: 🏗️ Build APK (debug)
       run: |
         export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-        buildozer android debug --storage-dir="$GITHUB_WORKSPACE/.p4a-build"
+        buildozer android debug --storage-dir "$GITHUB_WORKSPACE/.p4a-build"
 
     - name: 📤 Upload APK artifact
       uses: actions/upload-artifact@v4
