@@ -1,12 +1,11 @@
 [app]
 title = PortpromptGenie
-package.name = Portpromptgenie
+package.name = portpromptgenie
 package.domain = com.example
 source.dir = .
 source.include_exts = py,csv,json,png,jpg,kv
 version = 1.0.0
 requirements = \
-    python3, \
     kivy==2.3.0, \
     kivymd==1.2.0, \
     ffpyplayer, \
