@@ -2,11 +2,8 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "**/*.py"
-      - buildozer.spec
-      - .github/workflows/android.yml
+    branches: [ main ]
+    paths: ["**/*.py", "buildozer.spec", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 jobs:
@@ -15,17 +12,17 @@ jobs:
     timeout-minutes: 60
 
     env:
-      PYTHON_VERSION: "3.11"
+      PYTHON_VERSION: "3.10"            # samma som p4a.python_version
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_HOME:      ${{ github.workspace }}/android-sdk
-      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: 1
 
     steps:
-    # ─────────────────────────────────────────────────────────
+    # ────────────────────────────────────────────────────────────
     - name: 📥 Check out code
       uses: actions/checkout@v4
 
-    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+    - name: 🐍 Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
@@ -40,9 +37,8 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends \
-          build-essential autoconf automake m4 \
-          libtool libtool-bin libltdl-dev pkg-config \
-          zip unzip wget git ca-certificates \
+          build-essential autoconf automake m4 libtool libtool-bin \
+          libltdl-dev pkg-config zip unzip wget git ca-certificates \
           libffi-dev libssl-dev python3-pip
 
     - name: 💾 Cache Android SDK
@@ -50,9 +46,9 @@ jobs:
       id: cache-sdk
       with:
         path: ${{ env.ANDROID_SDK_ROOT }}
-        key: android-sdk-${{ runner.os }}-v5   # bumpa när du vill tömma cachen
+        key: android-sdk-${{ runner.os }}-v5
 
-    - name: 📦 Download cmdline‑tools (if cache miss)
+    - name: 📦 Install cmdline‑tools (if cache miss)
       if: steps.cache-sdk.outputs.cache-hit != 'true'
       run: |
         mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -64,23 +60,21 @@ jobs:
       run: |
         export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
         yes | sdkmanager --licenses
-        sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "ndk;25.2.9519653"
+        sdkmanager "platform-tools"        \
+                   "build-tools;34.0.0"    \
+                   "platforms;android-34"  \
+                   "ndk;25.2.9519653"
 
-    # ─── Python‑/Buildozer‑toolchain ─────────────────────────
-    - name: 🐍 Install Buildozer + pinned deps
+    - name: 🐍 Install Buildozer + python‑for‑android
       run: |
-        # uppdatera pip & bygghjul
-        python -m pip install --upgrade pip setuptools wheel
-        # Cython <3 krävs av p4a just nu
-        python -m pip install "Cython<3"
-        # stabil p4a‑release + buildozer
-        python -m pip install python-for-android==2024.4.23 "buildozer==1.*"
-        # se till att ~/.local/bin finns i PATH för följande steg
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        python -m pip install --upgrade pip wheel
+        # Exakt samma versioner som vi testat lokalt
+        python -m pip install Cython==0.29.36 \
+                             buildozer==1.*   \
+                             python-for-android==2023.9.16
 
     - name: 🔄 Clean previous state
-      run: |
-        buildozer android clean || true
+      run: buildozer android clean || true
 
     - name: 🏗️ Build APK (debug)
       run: |
