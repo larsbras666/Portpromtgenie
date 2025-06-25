@@ -2,28 +2,62 @@ name: Android APK
 
 on:
   push:
-    paths: ["**.py", "buildozer.spec"]
+    paths:
+      - "**/*.py"
+      - "buildozer.spec"
   workflow_dispatch:
+
+env:
+  # Byggvariabler som repeteras i flera steg
+  P4A_RELEASE: "2024.01.21"        # p4a‑tag som Buildozer hämtar
+  PY_VERSION: "3.11"               # Python som kör Buildozer
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Install buildozer
-        run: |
-          sudo apt update
-          sudo apt install -y zip openjdk-17-jdk python3-pip build-essential libffi-dev libssl-dev
-          pip3 install --user buildozer
-          pip3 install --user cython
-      - name: Build APK
-        run: |
-          export PATH=$PATH:$HOME/.local/bin
-          buildozer android debug || true
-          yes | $HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --licenses || true
-          buildozer android debug
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: PromptGenie-debug
-          path: bin/*.apk
+    # 1) Checka ut koden
+    - uses: actions/checkout@v4
+
+    # 2) Cacha Buildozer/Gradle/NDK för snabbare upprepade körningar
+    - name: Cache build tools
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.buildozer
+          ~/.gradle
+        key: build-tools-${{ runner.os }}-${{ env.P4A_RELEASE }}-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          build-tools-${{ runner.os }}-${{ env.P4A_RELEASE }}-
+
+    # 3) Installera Python 3.x och Java 11
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PY_VERSION }}
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "11"
+
+    # 4) Installera Buildozer (alltid senaste)
+    - name: Install Buildozer & deps
+      run: |
+        python -m pip install --upgrade --user cython buildozer==1.* wheel
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    # 5) Bygg APK
+    - name: Build release
+      run: |
+        buildozer android clean
+        buildozer android debug
+
+    # 6) Ladda upp artefakt
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: PromptGenie-debug
+        path: bin/*-debug.apk
