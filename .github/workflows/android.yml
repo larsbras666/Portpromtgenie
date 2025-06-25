@@ -1,6 +1,4 @@
-# Moved to .github/workflows/android.yml for GitHub Actions compatibility
-
-name: Android APK
+name: Android APK
 
 on:
   push:
