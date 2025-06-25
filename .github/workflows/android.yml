@@ -5,59 +5,70 @@ on:
     paths:
       - "**/*.py"
       - "buildozer.spec"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
-
-env:
-  # Byggvariabler som repeteras i flera steg
-  P4A_RELEASE: "2024.01.21"        # p4a‑tag som Buildozer hämtar
-  PY_VERSION: "3.11"               # Python som kör Buildozer
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      # byggozer plockar även upp ANDROID_HOME om det finns
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      PIP_DISABLE_PIP_VERSION_CHECK: 1
 
     steps:
-    # 1) Checka ut koden
-    - uses: actions/checkout@v4
+    - name: Check‑out repo
+      uses: actions/checkout@v4
 
-    # 2) Cacha Buildozer/Gradle/NDK för snabbare upprepade körningar
-    - name: Cache build tools
+    # ---------- OS‑paket ----------
+    - name: Install APT‑beroenden
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          openjdk-17-jdk unzip git wget build-essential \
+          libffi-dev libssl-dev python3-pip
+
+    # ---------- Python ----------
+    - name: Installera Buildozer + Cython
+      run: |
+        python -m pip install --upgrade --user cython 'buildozer==1.*'
+
+    # ---------- Cache ----------
+    - name: Cache Android‑SDK
+      id: cache
       uses: actions/cache@v4
       with:
         path: |
-          ~/.buildozer
-          ~/.gradle
-        key: build-tools-${{ runner.os }}-${{ env.P4A_RELEASE }}-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          build-tools-${{ runner.os }}-${{ env.P4A_RELEASE }}-
+          ${{ env.ANDROID_SDK_ROOT }}
+        key: android-sdk-${{ runner.os }}-v1
 
-    # 3) Installera Python 3.x och Java 11
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PY_VERSION }}
-
-    - name: Set up JDK 11
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: "11"
-
-    # 4) Installera Buildozer (alltid senaste)
-    - name: Install Buildozer & deps
+    # ---------- SDK / cmdline tools ----------
+    - name: Hämta cmdline‑tools (om ej i cache)
+      if: steps.cache.outputs.cache-hit != 'true'
       run: |
-        python -m pip install --upgrade --user cython buildozer==1.* wheel
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline.zip
+        unzip -q /tmp/cmdline.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+        mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
 
-    # 5) Bygg APK
-    - name: Build release
+    - name: Acceptera licenser + installera plattformar
       run: |
-        buildozer android clean
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "ndk;25.2.9519653"
+
+    # ---------- Bygg APK ----------
+    - name: Build APK (debug)
+      run: |
+        export PATH=$PATH:$HOME/.local/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
         buildozer android debug
 
-    # 6) Ladda upp artefakt
-    - name: Upload APK
+    # ---------- Artifact ----------
+    - name: Ladda upp APK
       uses: actions/upload-artifact@v4
       with:
         name: PromptGenie-debug
-        path: bin/*-debug.apk
+        path: bin/*.apk
