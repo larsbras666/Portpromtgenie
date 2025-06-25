@@ -1,23 +1,24 @@
 [app]
-title = PortpromptGenie
-package.name   = portpromptgenie
-package.domain = io.sfsstudioinc
+title           = PortpromptGenie
+package.name    = portpromptgenie          # endast gemener
+package.domain  = io.sfsstudioinc          # omvänd domän, små bokstäver
 
-# Kod & resurser
-source.dir = .
-source.include_exts = py,csv,json,png,jpg,kv
+# Källkod
+source.dir              = .
+source.include_exts     = py,csv,json,png,jpg,kv
+version                 = 1.0.0
 
-version = 1.0.0
+# Python‑ och Kivy‑beroenden
+requirements = python3==3.11.5,kivy==2.3.0,kivymd==1.2.0,requests,fpdf2,pyjnius,pillow
 
-requirements = python3,kivy==2.3.0,kivymd==1.2.0,requests,fpdf2,pyjnius,pillow
-android.permissions = INTERNET
-
-android.api   = 34
-android.minapi = 24
-android.ndk    = 25b
-android.archs  = arm64-v8a
+# Android‑inställningar
+android.permissions      = INTERNET
+android.api              = 34
+android.minapi           = 24
+android.ndk              = 25b
+android.archs            = arm64-v8a        # en enda arkitektur räcker
 android.accept_sdk_license = True
 
 [buildozer]
-log_level    = 2
-warn_on_root = 1        
+log_level     = 2          # 0=quiet, 1=info, 2=debug
+warn_on_root  = 1
