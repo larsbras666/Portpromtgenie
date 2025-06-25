@@ -15,6 +15,7 @@ jobs:
           sudo apt update
           sudo apt install -y zip openjdk-17-jdk python3-pip build-essential libffi-dev libssl-dev
           pip3 install --user buildozer
+          pip3 install --user cython
       - name: Build APK
         run: |
           export PATH=$PATH:$HOME/.local/bin

@@ -1,6 +1,6 @@
 [app]
-title = PromptGenie
-package.name = promptgenie
+title = PortpromptGenie
+package.name = Portpromptgenie
 package.domain = com.example
 source.dir = .
 source.include_exts = py,csv,json,png,jpg,kv

@@ -1,4 +1,4 @@
-# PromptGenie v12.0  (multi‑genre edition)
+# PortpromptGenie v12.0  (multi‑genre edition)
 # --------------------------------------------------
 #  • Prompt‑ och portfolio‑verktyg för mohair/fur‑,
 #    handritnings‑, arkitektur‑ m.fl. projekt.
