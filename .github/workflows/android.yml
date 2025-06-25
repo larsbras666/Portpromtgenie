@@ -1,57 +1,59 @@
-name: Android APK
+# .github/workflows/android.yml
+name: Android APK
 
 on:
   push:
-    # Kör bara när Python‑filer, buildozer.spec eller själva workflowet ändras
+    branches: [ main ]
     paths:
       - "**/*.py"
-      - "buildozer.spec"
+      - buildozer.spec
       - ".github/workflows/android.yml"
-  workflow_dispatch:      # manuell körning från GitHub‑UI
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04          # stabil LTS‑runner
-    timeout-minutes: 60            # gott om tid men inte oändligt
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
 
+    # Buildozer läser ANDROID_(SDK|HOME) om de finns
     env:
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_HOME:      ${{ github.workspace }}/android-sdk
-      PIP_DISABLE_PIP_VERSION_CHECK: 1
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
 
     steps:
-    # ─────────────────────────────────────────────────────────────────────────
-    # 0) Hämta koden
-    - uses: actions/checkout@v4
+    # ─────────────────────────────────────────────────────────
+    - name: 📥 Check out code
+      uses: actions/checkout@v4
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 1) Java 17 (krävs av nya Android cmdline‑tools)
-    - name: Set up Temurin 17
+    # ─────────────────────────────────────────────────────────
+    # 1) Host‑JDK 17 (krav för cmdline‑tools ≥ 9‑.*)
+    - name: ☕ Set up Temurin 17
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: 17
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 2) Systemberoenden (lägg till autotools så libffi & liknande kan bygga)
-    - name: Install system packages
+    # ─────────────────────────────────────────────────────────
+    # 2) Alla systemberoenden – inkluderar autotools för libffi
+    - name: 🛠️ Install system packages
       run: |
         sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends \
-          build-essential autoconf automake libtool pkg-config \
           zip unzip wget git ca-certificates \
-          libffi-dev libssl-dev python3-pip
+          build-essential libssl-dev libffi-dev python3-pip \
+          autoconf automake libtool pkg-config gawk
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 3) Cache / ladda ned Android SDK
-    - name: Cache Android SDK
+    # ─────────────────────────────────────────────────────────
+    # 3) Android SDK (cmdline‑tools) med cache
+    - name: 💾 Cache Android SDK
       id: cache-sdk
       uses: actions/cache@v4
       with:
         path: ${{ env.ANDROID_SDK_ROOT }}
-        key: android-sdk-${{ runner.os }}-v1
+        key: android-sdk-${{ runner.os }}-v2
 
-    - name: Download cmdline tools (if cache miss)
+    - name: 📦 Download cmdline-tools (if cache miss)
       if: steps.cache-sdk.outputs.cache-hit != 'true'
       run: |
         mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -59,11 +61,9 @@ jobs:
         unzip -q /tmp/cmdline.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
         mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 4) Acceptera licenser & installera plattform/NDK
-    - name: Accept licenses & install SDK/NDK
+    - name: ✅ Accept licenses & install platform/NDK
       run: |
-        export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+        export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
         yes | sdkmanager --licenses
         sdkmanager \
           "platform-tools" \
@@ -71,26 +71,24 @@ jobs:
           "platforms;android-34" \
           "ndk;25.2.9519653"
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 5) Installera Buildozer & Cython
-    - name: Install Buildozer and Python deps
+    # ─────────────────────────────────────────────────────────
+    # 4) Buildozer + python-for-android
+    - name: 🐍 Install Buildozer toolchain
       run: |
-        python -m pip install --upgrade --user pip
-        python -m pip install --upgrade --user cython "buildozer==1.*"
-        # Lägg till ~/.local/bin i PATH för resten av stegen
+        python -m pip install --upgrade --user "buildozer[android]==1.*" cython
         echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 6) Bygg APK (debug)
-    - name: Build APK (debug)
+    # ─────────────────────────────────────────────────────────
+    # 5) Bygg APK
+    - name: 🏗️ Build APK (debug)
       run: |
-        export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-        buildozer android debug
+        export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+        buildozer android debug --verbose
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # 7) Ladda upp APK‑artefakt
-    - name: Upload APK artifact
+    # ─────────────────────────────────────────────────────────
+    # 6) Ladda upp artefakt
+    - name: 📤 Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: PortpromptGenie-debug
+        name: portpromptgenie-debug
         path: bin/*.apk
